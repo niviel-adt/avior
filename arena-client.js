@@ -60,5 +60,21 @@ document.querySelector('header.topbar')?.addEventListener('click',e=>{if(e.targe
 document.querySelector('main#app')?.addEventListener('click',e=>{if(e.target.closest('[data-nav]'))route('')});
 arena.addEventListener('submit',async e=>{if(e.target.id==='arc-auth-form'){authenticate(e);return}if(e.target.id==='arc-gift-form'){e.preventDefault();try{notice('Delivering exclusive card…');const data=await api('admin/gift',{username:$('#arc-gift-name').value.trim(),card:$('#arc-gift-card').value});notice('Gifted '+data.card+' to '+data.recipient+'!')}catch(err){notice(err.message)}return}if(e.target.id==='arc-password-form'){e.preventDefault();try{await api('change-password',{currentPassword:$('#arc-current-password').value,newPassword:$('#arc-new-password').value});me=null;notice('Password changed. Please sign in again.');setTimeout(()=>location.reload(),900)}catch(err){notice(err.message)}return}});
 arena.addEventListener('click',e=>{const pick=e.target.closest('[data-pick]');if(pick){const k=pick.dataset.pick;if(selected.includes(k))selected=selected.filter(x=>x!==k);else if(selected.length<3)selected.push(k);render();return}const s=e.target.closest('[data-skill]');if(s){move(s.dataset.skill);return}const b=e.target.closest('[data-arc-act]');if(!b)return;switch(b.dataset.arcAct){case 'switch-auth':authView=authView==='login'?'register':'login';render();break;case 'go-login':route('account');break;case 'enter-arena':route('arena');break;case 'go-admin':route('admin');break;case 'go-password':route('password');break;case 'refresh-gifts':api('admin/gifts').then(x=>{const t=$('#arc-gifts');if(t)t.innerHTML=(x.gifts||[]).map(g=>'<div>'+esc(g.to)+' received '+esc(g.card)+' · '+new Date(g.at).toLocaleString()+'</div>').join('')||'No gifts yet'}).catch(e=>notice(e.message));break;case 'logout':logout();break;case 'create':enterRoom('create');break;case 'join':enterRoom('join');break;case 'back':activeCode=null;match=null;stopPoll();route('arena');break;case 'copy':navigator.clipboard?.writeText(b.dataset.code);notice('Invite code copied!');break;}});
-(async()=>{try{const data=await api('me');me=data.user;if(me){lastCollection=localStorage.getItem(key)||'';if(me.collection&&!Object.keys(state().collection||{}).length){localStorage.setItem(key,JSON.stringify(me.collection));location.reload()}}updateHeader()}catch(e){console.warn('Authentication unavailable:',e.message)}})();
+// Restore the signed-in player's saved cards without recursively reloading the page.
+// Empty collections (including a fresh admin account) are valid and must not
+// cause the app to reload. Login itself already performs one refresh.
+(async()=>{try{
+  const data=await api('me');
+  me=data.user;
+  if(me){
+    const remote=me.collection;
+    const local=state();
+    if(remote && Object.keys(local.collection||{}).length===0 && Object.keys(remote.collection||{}).length>0){
+      localStorage.setItem(key,JSON.stringify(remote));
+    }
+    lastCollection=localStorage.getItem(key)||'';
+  }
+  updateHeader();
+  if(mode)render();
+}catch(e){console.warn('Authentication unavailable:',e.message)}})();
 })();
